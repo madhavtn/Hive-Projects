@@ -7,4 +7,4 @@ Topics covered:
 3. Map data structure
 4. Serialization
 5. Deserialization
-6. File formats: Parquet, Avro, CSV, JSON, TSV
+6. File formats: Parquet, Avro, CSV, JSON, TSV, ORC
