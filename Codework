@@ -1,0 +1,40 @@
+# Functions for map data type
+select
+id,
+name,
+details,
+size(details) as size_of_each_map,
+map_keys(details) as distinct_map_keys,
+map_values(details) as distinct_map_values
+from employee_map_data;
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 01/01  [==========================>>] 100%  ELAPSED TIME: 8.32 s     
+----------------------------------------------------------------------------------------------
+OK
+101     Amit    {"age":"21","gender":"M"}       2       ["age","gender"]        ["21","M"]
+102     Sumit   {"age":"24","gender":"M"}       2       ["age","gender"]        ["24","M"]
+103     Mansi   {"age":"23","gender":"F"}       2       ["age","gender"]        ["23","F"]
+Time taken: 9.098 seconds, Fetched: 3 row(s)
+
+select
+id,
+name,
+details["gender"] as employee_gender
+from employee_map_data;
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 01/01  [==========================>>] 100%  ELAPSED TIME: 10.05 s    
+----------------------------------------------------------------------------------------------
+OK
+101     Amit    M
+102     Sumit   M
+103     Mansi   F
+Time taken: 13.044 seconds, Fetched: 3 row(s)
