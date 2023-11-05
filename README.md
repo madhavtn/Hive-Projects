@@ -9,3 +9,22 @@ Topics covered:
 5. Deserialization
 6. SerDe
 7. File formats: Parquet, Avro, CSV, JSON, TSV, ORC
+8. CSV SerDe
+9. JSON SerDe
+10. Parquet SerDe
+11. ORC SerDe
+12. Static Partitioning
+13. Dynamic Partitioning
+14. Bucketing
+15. Map-Side Join, Bucket Map Join, Sorted Merge Join, Skew Join
+
+
+
+
+
+
+
+
+
+
+
