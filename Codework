@@ -38,3 +38,490 @@ OK
 102     Sumit   M
 103     Mansi   F
 Time taken: 13.044 seconds, Fetched: 3 row(s)
+
+#To take a backup of existing table
+hive> create table sales_data_v2_backup as select * from sales_data_v2;
+Query ID = madhavtn95_20231108102057_f6671cee-33da-4270-a7f9-3ff87cd8e38c
+Total jobs = 1
+Launching Job 1 out of 1
+Tez session was closed. Reopening...
+Session re-established.
+Session re-established.
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0003)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 01/01  [==========================>>] 100%  ELAPSED TIME: 9.02 s     
+----------------------------------------------------------------------------------------------
+Moving data to directory hdfs://hadoop-cluster-m/user/hive/warehouse/hive_db.db/sales_data_v2_backup
+OK
+sales_data_v2.p_type    sales_data_v2.total_sales
+Time taken: 27.133 seconds
+
+#CSV Serde
+hive> create table csv_table
+    > (
+    > name string,
+    > location string
+    > )
+    > row format serde 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
+    > with serdeproperties (
+    >   'separatorChar' = ',',
+    >   'quoteChar' = '\"',
+    >   'escapeChar' = '\\'
+    > )
+    > stored as textfile
+    > tblproperties ("skip.header.line.count" = "1");
+OK
+Time taken: 0.334 seconds
+hive> load data local inpath 'file:///home/madhavtn95/csv_file.csv' into table csv_table;
+Loading data to table hive_db.csv_table
+OK
+Time taken: 0.521 seconds
+hive> select * from csv_table;
+OK
+Amit    Bangalore,India
+Shashank        Gurgaon,India
+Time taken: 0.287 seconds, Fetched: 2 row(s)
+
+#JSON Serde
+hive> create table json_table
+    > ( name string,
+    > id int,
+    > skills array<string>
+    > )
+    > row format serde 'org.apache.hadoop.hive.serde2.JsonSerDe'
+    > stored as textfile;
+OK
+Time taken: 0.579 seconds
+hive> load data local inpath 'file:///home/madhavtn95/json_file.json' into table json_table;
+Loading data to table default.json_table
+OK
+Time taken: 0.599 seconds
+hive> select * from json_table;
+OK
+Amit    1       ["Hadoop","Python"]
+sumit   2       ["Hadoop","Hive"]
+Shashank        3       ["Airflow","Python"]
+Time taken: 1.867 seconds, Fetched: 3 row(s)
+hive> set hive.cli.header.print=true;
+Query returned non-zero code: 1, cause: hive configuration hive.cli.header.print does not exists.
+hive> set hive.cli.print.header=true;
+hive> select * from json_table;
+OK
+json_table.name json_table.id   json_table.skills
+Amit    1       ["Hadoop","Python"]
+sumit   2       ["Hadoop","Hive"]
+Shashank        3       ["Airflow","Python"]
+Time taken: 0.254 seconds, Fetched: 3 row(s)
+
+#Hive will not do internal conversion from csv to parquet format if we load data from a local storage to a managed table of parquet type.
+#Inorder to do that a temp managed table of csv needs to be created first and then load it in to parquet table
+hive> create table sales_data_pq_final
+    > (product_type string, total_sales int )
+    > stored as parquet;
+OK
+Time taken: 0.415 seconds
+hive> load data local inpath 'file:///home/madhavtn95/sales_data_raw.csv' into table sales_data_pq_final;
+Loading data to table hive_db.sales_data_pq_final
+OK
+Time taken: 0.548 seconds
+hive> select * from sales_data_pq_final;
+OK
+sales_data_pq_final.product_type        sales_data_pq_final.total_sales
+Failed with exception java.io.IOException:java.lang.RuntimeException: hdfs://hadoop-cluster-m/user/hive/warehouse/hive_db.db/sales_data_pq_final/sales_data_raw.csv is not a Parquet file. Expected magic number at tail, but found [48, 48, 32, 10]
+Time taken: 2.061 seconds
+hive> drop table sales_data_pq_final;
+OK
+Time taken: 0.307 seconds
+hive> create table sales_data_pq_final
+    > (
+    > product_type string,
+    > total_sales int
+    > )
+    > stored as parquet;
+OK
+Time taken: 0.096 seconds
+hive> from sales_data_v2 insert overwrite table sales_data_pq_final select *;
+Query ID = madhavtn95_20231108113815_3602f94a-7863-4f22-aeb0-7380a1ebc34e
+Total jobs = 1
+Launching Job 1 out of 1
+Tez session was closed. Reopening...
+Session re-established.
+Session re-established.
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0007)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Reducer 2 ...... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 11.38 s    
+----------------------------------------------------------------------------------------------
+Loading data to table hive_db.sales_data_pq_final
+OK
+sales_data_v2.p_type    sales_data_v2.total_sales
+Time taken: 26.183 seconds
+hive> select * from sales_data_pq_final;
+OK
+sales_data_pq_final.product_type        sales_data_pq_final.total_sales
+clothes 1000
+toys    2000
+clocks  NULL
+Time taken: 0.282 seconds, Fetched: 3 row(s)
+
+#ORC file format
+hive> create table automobile_sales_data_orc ( ORDERNUMBER int, QUANTITYORDERED int, PRICEEACH float, ORDERLINENUMBER int, SALES float, STATUS string, QTR_ID int, MONTH_ID int, YEAR_ID int, PRODUCTLINE string, MSRP int, PRODUCTCODE string, PHONE string, CITY string, STATE string, POSTALCODE string, COUNTRY string, TERRITORY string, CONTACTLASTNAME string, CONTACTFIRSTNAME string, DEALSIZE string ) stored as orc;
+OK
+Time taken: 0.39 seconds
+hive> from automobile_sales_data insert overwrite table automobile_sales_data_orc select *;
+Query ID = madhavtn95_20231108115810_eaaaf680-f2e0-454b-879f-137514fb5a88
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0009)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Reducer 2 ...... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 11.08 s    
+----------------------------------------------------------------------------------------------
+Loading data to table hive_db.automobile_sales_data_orc
+OK
+Time taken: 15.111 seconds
+hive> select * from automobile_sales_data_orc limit 5;
+OK
+10107   30      95.7    2       2871.0  Shipped 1       2       2003    Motorcycles     95      S10_1678      2125557818       NYC     NY      10022   USA     NA      Yu      Kwai    Small
+10121   34      81.35   5       2765.9  Shipped 2       5       2003    Motorcycles     95      S10_1678      26.47.1555       Reims           51100   France  EMEA    Henriot Paul    Small
+10134   41      94.74   2       3884.34 Shipped 3       7       2003    Motorcycles     95      S10_1678      +33 1 46 62 7555 Paris           75508   France  EMEA    Da Cunha        Daniel  Medium
+10145   45      83.26   6       3746.7  Shipped 3       8       2003    Motorcycles     95      S10_1678      6265557265       Pasadena        CA      90003   USA     NA      Young   Julie   Medium
+10159   49      100.0   14      5205.27 Shipped 4       10      2003    Motorcycles     95      S10_1678      6505551386       San Francisco   CA              USA     NA      Brown   Julie   Medium
+Time taken: 0.352 seconds, Fetched: 5 row(s)
+
+#Static Partitioning
+#Creating a specific table inside hdfs db for country USA using static partitioning
+hive> set hive.mapred.mode=strict;
+hive> create table automobile_sales_data_static_part(ordernumber int, quantityordered int, sales float,year_id int)partitioned by (country string);
+OK
+Time taken: 0.328 seconds
+hive> insert overwrite table automobile_sales_data_static_part partition(country = 'USA')
+    > select ordernumber,quantityordered,sales,year_id from automobile_sales_data_orc where
+    > country = 'USA';
+Query ID = madhavtn95_20231108154123_3fa3a23b-0cd9-48b6-aec5-7b3c1994de8a
+Total jobs = 1
+Launching Job 1 out of 1
+Tez session was closed. Reopening...
+Session re-established.
+Session re-established.
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0012)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Reducer 2 ...... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 11.66 s    
+----------------------------------------------------------------------------------------------
+Loading data to table hive_db.automobile_sales_data_static_part partition (country=USA)
+OK
+Time taken: 31.261 seconds
+
+hive> select * from automobile_sales_data_static_part limit 10;
+OK
+10107   30      2871.0  2003    USA
+10145   45      3746.7  2003    USA
+10159   49      5205.27 2003    USA
+10168   36      3479.76 2003    USA
+10201   22      2168.54 2003    USA
+10237   23      2333.12 2004    USA
+10251   28      3188.64 2004    USA
+10263   34      3676.76 2004    USA
+10285   36      4099.68 2004    USA
+10318   46      4358.04 2004    USA
+Time taken: 2.386 seconds, Fetched: 10 row(s)
+
+#Dynamic Partitioning
+hive> create table automobile_sales_data_dynamic_part(ordernumber int,quantiyiordered int,sales float,year_id int)partitioned by (country string);
+OK
+Time taken: 0.325 seconds
+hive> insert overwrite table automobile_sales_data_dynamic_part partition(country)
+    > select ordernumber,quantityordered,sales,year_id,country from automobile_sales_data_orc;
+Query ID = madhavtn95_20231108163702_56f62990-a608-41cb-9c25-0e0600802f21
+Total jobs = 1
+Launching Job 1 out of 1
+Tez session was closed. Reopening...
+Session re-established.
+Session re-established.
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0015)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Reducer 2 ...... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 11.90 s    
+----------------------------------------------------------------------------------------------
+Loading data to table hive_db.automobile_sales_data_dynamic_part partition (country=null)
+
+Loaded : 19/19 partitions.
+         Time taken to load dynamic partitions: 2.588 seconds
+         Time taken for adding to write entity : 0.004 seconds
+OK
+Time taken: 32.174 seconds
+hive> select * from automobile_sales_data_dynamic_part limit 5;
+OK
+10223   37      3965.66 2004    Australia
+10361   20      1451.0  2004    Australia
+10174   34      8014.82 2003    Australia
+10270   21      4905.39 2004    Australia
+10347   30      3944.7  2004    Australia
+Time taken: 0.501 seconds, Fetched: 5 row(s)
+
+#Files created in HDFS
+Found 19 items
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Australia
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Austria
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Belgium
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Canada
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Denmark
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Finland
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=France
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Germany
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Ireland
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Italy
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Japan
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Norway
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Philippines
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Singapore
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Spain
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Sweden
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=Switzerland
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=UK
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:37 /user/hive/warehouse/hive_db.db/automobile_sales_data_dynamic_part/country=USA
+
+
+#Dynamic Partitioning Multilevel
+hive> insert overwrite table automobile_sales_dynamic_multilevel_part partition(country,year_id) select ordernumber,quantityordered,sales,country ,year_id from automobile_sales_data_orc;
+FAILED: SemanticException [Error 10096]: Dynamic partition strict mode requires at least one static partition column. To turn this off set hive.exec.dynamic.partition.mode=nonstrict
+hive> set hive.exec.dynamic.partition.mode=nonstrict;
+hive> insert overwrite table automobile_sales_dynamic_multilevel_part partition(country,year_id) select ordernumber,quantityordered,sales,country ,year_id from automobile_sales_data_orc;
+Query ID = madhavtn95_20231108165135_7ecd373a-c20e-45ff-a860-6463634b0b30
+Total jobs = 1
+Launching Job 1 out of 1
+Tez session was closed. Reopening...
+Session re-established.
+Session re-established.
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0017)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Reducer 2 ...... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 13.64 s    
+----------------------------------------------------------------------------------------------
+Loading data to table hive_db.automobile_sales_dynamic_multilevel_part partition (country=null, year_id=null)
+
+Loaded : 49/49 partitions.
+         Time taken to load dynamic partitions: 5.763 seconds
+         Time taken for adding to write entity : 0.026 seconds
+OK
+Time taken: 40.969 seconds
+
+#File directory
+madhavtn95@hadoop-cluster-m:~$ hdfs dfs -ls /user/hive/warehouse/hive_db.db/automobile_sales_dynamic_multilevel_part/country=USA
+Found 3 items
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:52 /user/hive/warehouse/hive_db.db/automobile_sales_dynamic_multilevel_part/country=USA/year_id=2003
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:52 /user/hive/warehouse/hive_db.db/automobile_sales_dynamic_multilevel_part/country=USA/year_id=2004
+drwxr-xr-x   - madhavtn95 hadoop          0 2023-11-08 16:52 /user/hive/warehouse/hive_db.db/automobile_sales_dynamic_multilevel_part/country=USA/year_id=2005
+
+
+
+#Bucketing
+hive> set hive.enforce.bucketing=true;
+hive> create table buck_users (
+    > id int,name string,salary int,unit string)
+    > clustered by (id) into 2 buckets;
+OK
+Time taken: 0.101 seconds
+hive> insert overwrite table buck_users select * from users;
+Query ID = madhavtn95_20231108185753_7c703ae0-9c47-463d-86a8-147157850653
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0019)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Reducer 2 ...... container     SUCCEEDED      2          2        0        0       0       0  
+Reducer 3 ...... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 03/03  [==========================>>] 100%  ELAPSED TIME: 12.10 s    
+----------------------------------------------------------------------------------------------
+Loading data to table hive_db.buck_users
+OK
+Time taken: 13.539 seconds
+hive> select  * from buck_users;
+OK
+6       Mahoor  200     FCS
+3       Yadav   300     DNA
+2       Sumit   200     DNA
+8       Chandra 500     DNA
+5       Kranti  100     FCS
+4       Sunil   500     FCS
+1       Amit    100     DNA
+Time taken: 0.196 seconds, Fetched: 7 row(s)
+
+#Directories created
+madhavtn95@hadoop-cluster-m:~$ hdfs dfs -ls /user/hive/warehouse/hive_db.db/buck_users
+Found 2 items
+-rw-r--r--   2 madhavtn95 hadoop         49 2023-11-08 18:58 /user/hive/warehouse/hive_db.db/buck_users/000000_0
+-rw-r--r--   2 madhavtn95 hadoop         66 2023-11-08 18:58 /user/hive/warehouse/hive_db.db/buck_users/000001_0
+
+
+
+#Map-Side Join, Bucket Map Join, Sorted Merge Join, Skew Join
+hive> create table buck_users
+    > (
+    >  id int,
+    >  name string,
+    >  salary int,
+    >  unit string
+    > )
+    > clustered by (id)
+    > sorted by (id)
+    > into 2 buckets;
+OK
+Time taken: 0.109 seconds
+hive> insert overwrite table buck_users select * from users;
+Query ID = madhavtn95_20231108211045_497f4404-2fa5-45c6-a3ac-f5cf8563634f
+Total jobs = 1
+Launching Job 1 out of 1
+Tez session was closed. Reopening...
+Session re-established.
+Session re-established.
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0021)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Reducer 2 ...... container     SUCCEEDED      2          2        0        0       0       0  
+Reducer 3 ...... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 03/03  [==========================>>] 100%  ELAPSED TIME: 12.73 s    
+----------------------------------------------------------------------------------------------
+Loading data to table hive_db.buck_users
+OK
+Time taken: 28.661 seconds
+hive> create table buck_locations
+    > (
+    >  id int,
+    >  location string
+    > )
+    > clustered by (id)
+    > sorted by (id)
+    > into 2 buckets;
+OK
+Time taken: 0.12 seconds
+hive> insert overwrite table buck_locations select * from locations;
+Query ID = madhavtn95_20231108211207_36147c53-d6a8-491c-a28f-f559c95113f2
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0021)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Reducer 2 ...... container     SUCCEEDED      2          2        0        0       0       0  
+Reducer 3 ...... container     SUCCEEDED      1          1        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 03/03  [==========================>>] 100%  ELAPSED TIME: 9.95 s     
+----------------------------------------------------------------------------------------------
+Loading data to table hive_db.buck_locations
+OK
+Time taken: 11.051 seconds
+hive> set hive.auto.convert.join=true;
+hive> SELECT * FROM buck_users u INNER JOIN buck_locations l ON u.id = l.id;
+Query ID = madhavtn95_20231108211452_696301b5-ab68-429e-8a1f-f3f5976246ff
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0021)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 2 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Map 1 .......... container     SUCCEEDED      2          2        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 20.36 s    
+----------------------------------------------------------------------------------------------
+OK
+2       Sumit   200     DNA     2       BIHAR
+3       Yadav   300     DNA     3       MP
+6       Mahoor  200     FCS     6       GOA
+1       Amit    100     DNA     1       UP
+4       Sunil   500     FCS     4       AP
+5       Kranti  100     FCS     5       MAHARASHTRA
+Time taken: 21.787 seconds, Fetched: 6 row(s)
+hive> set hive.optimize.bucketmapjoin=true; 
+hive> SELECT * FROM buck_users u INNER JOIN buck_locations l ON u.id = l.id;
+Query ID = madhavtn95_20231108211705_3c8a04d7-51af-4a73-a047-58fbc6788d91
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0021)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 2 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Map 1 .......... container     SUCCEEDED      2          2        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 18.69 s    
+----------------------------------------------------------------------------------------------
+OK
+2       Sumit   200     DNA     2       BIHAR
+3       Yadav   300     DNA     3       MP
+6       Mahoor  200     FCS     6       GOA
+1       Amit    100     DNA     1       UP
+4       Sunil   500     FCS     4       AP
+5       Kranti  100     FCS     5       MAHARASHTRA
+Time taken: 19.488 seconds, Fetched: 6 row(s)
+hive> set hive.auto.convert.sortmerge.join=true;
+hive> set hive.optimize.bucketmapjoin.sortedmerge = true;
+hive> SELECT * FROM buck_users u INNER JOIN buck_locations l ON u.id = l.id;
+Query ID = madhavtn95_20231108211954_ed166497-195c-421a-a886-8923a59e8c4f
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1699436608191_0021)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED  
+----------------------------------------------------------------------------------------------
+Map 2 .......... container     SUCCEEDED      1          1        0        0       0       0  
+Map 1 .......... container     SUCCEEDED      2          2        0        0       0       0  
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 19.59 s    
+----------------------------------------------------------------------------------------------
+OK
+2       Sumit   200     DNA     2       BIHAR
+3       Yadav   300     DNA     3       MP
+6       Mahoor  200     FCS     6       GOA
+1       Amit    100     DNA     1       UP
+4       Sunil   500     FCS     4       AP
+5       Kranti  100     FCS     5       MAHARASHTRA
+Time taken: 20.248 seconds, Fetched: 6 row(s)
+
+
+
