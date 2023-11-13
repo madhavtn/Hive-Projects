@@ -1,4 +1,4 @@
-# Functions for map data type
+__Functions for map data type__
 select
 id,
 name,
